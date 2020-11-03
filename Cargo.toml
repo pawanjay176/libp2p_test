@@ -10,19 +10,30 @@ edition = "2018"
 async-trait = "0.1"
 bytes = "0.5.6"
 futures = "0.3.1"
+snap = "1.0.1"
 log = "0.4.11"
 lru = "0.6"
 minicbor = { version = "0.6", features = ["std", "derive"] }
 rand = "0.7"
 smallvec = "1.4"
-unsigned-varint = { version = "0.5", features = ["std", "futures"] }
+unsigned-varint = { git = "https://github.com/sigp/unsigned-varint", branch = "latest-codecs", features = ["codec"] }
 wasm-timer = "0.2"
 # rand = "0.7"
 env_logger = "0.8"
 tokio = { version = "0.2.22", features = ["full"] }
+slog = { version = "2.5.2", features = ["max_level_trace"] }
+slog-term = "2.6.0"
+slog-async = "2.5.0"
+fnv = "1.0.7"
+serde = { version = "1.0.116", features = ["derive"] }
+serde_derive = "1.0.116"
+eth2_ssz = "0.1.2"
+eth2_ssz_derive = "0.1.0"
+tokio-util = { version = "0.3.1", features = ["codec", "compat"] }
+tokio-io-timeout = "0.4.0"
 
 [dependencies.libp2p]
-#version = "0.23.0"
-path = "/home/pawan/eth2/rust-libp2p"
+version = "0.28.0"
+# version = "0.29.0"
 default-features = false
-features = ["identify", "mplex", "noise", "tcp-tokio", "request-response"]
+features = ["identify", "mplex", "noise", "tcp-tokio"]
