@@ -1,10 +1,6 @@
 use super::methods::*;
 use crate::rpc::{
-    codec::{
-        base::{BaseInboundCodec, BaseOutboundCodec},
-        ssz_snappy::{SSZSnappyInboundCodec, SSZSnappyOutboundCodec},
-        InboundCodec, OutboundCodec,
-    },
+    codec::{SimpleInboundCodec, SimpleOutboundCodec},
     methods::ResponseTermination,
 };
 use futures::future::BoxFuture;
@@ -19,8 +15,6 @@ use tokio_util::{
     compat::{Compat, FuturesAsyncReadCompatExt},
 };
 
-/// The maximum bytes that can be sent across the RPC.
-const MAX_RPC_SIZE: usize = 1_048_576; // 1M
 /// The protocol prefix the RPC protocol id.
 const PROTOCOL_PREFIX: &str = "/eth2/beacon_chain/req";
 /// Time allowed for the first byte of a request to arrive before we time out (Time To First Byte).
@@ -173,7 +167,7 @@ impl ProtocolName for ProtocolId {
 // handler to respond to once ready.
 
 pub type InboundOutput<TSocket> = (RPCRequest, InboundFramed<TSocket>);
-pub type InboundFramed<TSocket> = Framed<TimeoutStream<Compat<TSocket>>, InboundCodec>;
+pub type InboundFramed<TSocket> = Framed<TimeoutStream<Compat<TSocket>>, SimpleInboundCodec>;
 
 impl<TSocket> InboundUpgrade<TSocket> for RPCProtocol
 where
@@ -188,13 +182,7 @@ where
             let protocol_name = protocol.message_name;
             // convert the socket to tokio compatible socket
             let socket = socket.compat();
-            let codec = match protocol.encoding {
-                Encoding::SSZSnappy => {
-                    let ssz_snappy_codec =
-                        BaseInboundCodec::new(SSZSnappyInboundCodec::new(protocol, MAX_RPC_SIZE));
-                    InboundCodec::SSZSnappy(ssz_snappy_codec)
-                }
-            };
+            let codec = SimpleInboundCodec::new(protocol);
             let mut timed_socket = TimeoutStream::new(socket);
             timed_socket.set_read_timeout(Some(Duration::from_secs(TTFB_TIMEOUT)));
 
@@ -284,7 +272,7 @@ impl RPCRequest {
 
 /* Outbound upgrades */
 
-pub type OutboundFramed<TSocket> = Framed<Compat<TSocket>, OutboundCodec>;
+pub type OutboundFramed<TSocket> = Framed<Compat<TSocket>, SimpleOutboundCodec>;
 
 impl<TSocket> OutboundUpgrade<TSocket> for RPCRequest
 where
@@ -297,13 +285,7 @@ where
     fn upgrade_outbound(self, socket: TSocket, protocol: Self::Info) -> Self::Future {
         // convert to a tokio compatible socket
         let socket = socket.compat();
-        let codec = match protocol.encoding {
-            Encoding::SSZSnappy => {
-                let ssz_snappy_codec =
-                    BaseOutboundCodec::new(SSZSnappyOutboundCodec::new(protocol, MAX_RPC_SIZE));
-                OutboundCodec::SSZSnappy(ssz_snappy_codec)
-            }
-        };
+        let codec = SimpleOutboundCodec::new(protocol);
 
         let mut socket = Framed::new(socket, codec);
 
