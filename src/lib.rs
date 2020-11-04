@@ -108,29 +108,8 @@ impl MyBehaviour {
     }
 }
 
-// // use this for libp2p 0.29.0
-// pub fn mk_transport() -> (PublicKey, transport::Boxed<(PeerId, StreamMuxerBox)>) {
-//     let transport = TokioTcpConfig::new().nodelay(true);
-//     let id_keys = identity::Keypair::generate_ed25519();
-//     let pk = id_keys.public();
-//     let noise_keys = Keypair::<X25519Spec>::new()
-//         .into_authentic(&id_keys)
-//         .unwrap();
-
-//     let transport = transport
-//         .upgrade(libp2p::core::upgrade::Version::V1)
-//         .authenticate(NoiseConfig::xx(noise_keys).into_authenticated())
-//         .multiplex(libp2p::mplex::MplexConfig::new())
-//         .timeout(std::time::Duration::from_secs(10))
-//         .boxed();
-//     (pk, transport)
-// }
-
-// use this for libp2p 0.28.0
-pub fn mk_transport() -> (
-    PublicKey,
-    transport::boxed::Boxed<(PeerId, StreamMuxerBox), std::io::Error>,
-) {
+// use this for libp2p 0.29.0
+pub fn mk_transport() -> (PublicKey, transport::Boxed<(PeerId, StreamMuxerBox)>) {
     let transport = TokioTcpConfig::new().nodelay(true);
     let id_keys = identity::Keypair::generate_ed25519();
     let pk = id_keys.public();
@@ -143,8 +122,29 @@ pub fn mk_transport() -> (
         .authenticate(NoiseConfig::xx(noise_keys).into_authenticated())
         .multiplex(libp2p::mplex::MplexConfig::new())
         .timeout(std::time::Duration::from_secs(10))
-        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
-        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
         .boxed();
     (pk, transport)
 }
+
+// // use this for libp2p 0.28.0
+// pub fn mk_transport() -> (
+//     PublicKey,
+//     transport::boxed::Boxed<(PeerId, StreamMuxerBox), std::io::Error>,
+// ) {
+//     let transport = TokioTcpConfig::new().nodelay(true);
+//     let id_keys = identity::Keypair::generate_ed25519();
+//     let pk = id_keys.public();
+//     let noise_keys = Keypair::<X25519Spec>::new()
+//         .into_authentic(&id_keys)
+//         .unwrap();
+
+//     let transport = transport
+//         .upgrade(libp2p::core::upgrade::Version::V1)
+//         .authenticate(NoiseConfig::xx(noise_keys).into_authenticated())
+//         .multiplex(libp2p::mplex::MplexConfig::new())
+//         .timeout(std::time::Duration::from_secs(10))
+//         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
+//         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+//         .boxed();
+//     (pk, transport)
+// }

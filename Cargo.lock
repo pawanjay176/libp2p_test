@@ -119,9 +119,12 @@ dependencies = [
 
 [[package]]
 name = "atomic"
-version = "0.4.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64f46ca51dca4837f1520754d1c8c36636356b81553d928dc9c177025369a06e"
+checksum = "c3410529e8288c463bedb5930f82833bc0c90e5d2fe639a56582a4d09220b281"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "atty"
@@ -262,12 +265,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
-name = "c_linked_list"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4964518bd3b4a8190e832886cdc0da9794f12e8e6c1613a9e90ff331c4c8724b"
-
-[[package]]
 name = "cc"
 version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -400,19 +397,6 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d85653f070353a16313d0046f173f70d1aadd5b42600a14de626f0dfb3473a5"
-dependencies = [
- "byteorder",
- "digest 0.8.1",
- "rand_core 0.5.1",
- "subtle 2.3.0",
- "zeroize",
-]
-
-[[package]]
-name = "curve25519-dalek"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8492de420e9e60bc9a1d66e2dbb91825390b738a388606600663fc529b4b307"
@@ -484,7 +468,7 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
- "curve25519-dalek 3.0.0",
+ "curve25519-dalek",
  "ed25519",
  "rand 0.7.3",
  "serde",
@@ -734,12 +718,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcc"
-version = "0.3.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
-
-[[package]]
 name = "generic-array"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -756,28 +734,6 @@ checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
 dependencies = [
  "typenum",
  "version_check",
-]
-
-[[package]]
-name = "get_if_addrs"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abddb55a898d32925f3148bd281174a68eeb68bbfd9a5938a57b18f506ee4ef7"
-dependencies = [
- "c_linked_list",
- "get_if_addrs-sys",
- "libc",
- "winapi 0.2.8",
-]
-
-[[package]]
-name = "get_if_addrs-sys"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d04f9fb746cf36b191c00f3ede8bde9c8e64f9f4b05ae2694a9ccf5e3f5ab48"
-dependencies = [
- "gcc",
- "libc",
 ]
 
 [[package]]
@@ -872,6 +828,27 @@ dependencies = [
  "matches",
  "unicode-bidi",
  "unicode-normalization",
+]
+
+[[package]]
+name = "if-addrs"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28538916eb3f3976311f5dfbe67b5362d0add1293d0a9cad17debf86f8e3aa48"
+dependencies = [
+ "if-addrs-sys",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "if-addrs-sys"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de74b9dd780476e837e5eb5ab7c88b49ed304126e412030a0adba99c8efe79ea"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
@@ -974,9 +951,9 @@ checksum = "4d58d1b70b004888f764dfbf6a26a3b0342a1632d33968e4a179d8011c760614"
 
 [[package]]
 name = "libp2p"
-version = "0.28.1"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "571f5a4604c1a40d75651da141dfde29ad15329f537a779528803297d2220274"
+checksum = "021f703bfef6e3da78ef9828c8a244d639b8d57eedf58360922aca5ff69dfdcd"
 dependencies = [
  "atomic",
  "bytes",
@@ -991,17 +968,17 @@ dependencies = [
  "libp2p-tcp",
  "multihash",
  "parity-multiaddr",
- "parking_lot 0.10.2",
- "pin-project 0.4.27",
+ "parking_lot",
+ "pin-project 1.0.1",
  "smallvec",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-core"
-version = "0.22.1"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52f13ba8c7df0768af2eb391696d562c7de88cc3a35122531aaa6a7d77754d25"
+checksum = "3960524389409633550567e8a9e0684d25a33f4f8408887ff897dd9fdfbdb771"
 dependencies = [
  "asn1_der",
  "bs58",
@@ -1016,17 +993,17 @@ dependencies = [
  "multihash",
  "multistream-select",
  "parity-multiaddr",
- "parking_lot 0.10.2",
- "pin-project 0.4.27",
+ "parking_lot",
+ "pin-project 1.0.1",
  "prost",
  "prost-build",
  "rand 0.7.3",
  "ring",
  "rw-stream-sink",
- "sha2 0.8.2",
+ "sha2 0.9.2",
  "smallvec",
  "thiserror",
- "unsigned-varint 0.4.0",
+ "unsigned-varint 0.5.1",
  "void",
  "zeroize",
 ]
@@ -1043,9 +1020,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identify"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56396ee63aa9164eacf40c2c5d2bda8c4133c2f57e1b0425d51d3a4e362583b1"
+checksum = "03b90b350e37f398b73d778bd94422f4e6a3afa2c1582742ce2446b8a0dba787"
 dependencies = [
  "futures",
  "libp2p-core",
@@ -1059,28 +1036,30 @@ dependencies = [
 
 [[package]]
 name = "libp2p-mplex"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a73a799cc8410b36e40b8f4c4b6babbcb9efd3727111bf517876e4acfa612d3"
+checksum = "a92b538238c80067c6417a58a07e41002b69d129355b60ec147d6337fdff0eb0"
 dependencies = [
  "bytes",
- "fnv",
  "futures",
  "futures_codec",
  "libp2p-core",
  "log",
- "parking_lot 0.10.2",
- "unsigned-varint 0.4.0",
+ "nohash-hasher",
+ "parking_lot",
+ "rand 0.7.3",
+ "smallvec",
+ "unsigned-varint 0.5.1",
 ]
 
 [[package]]
 name = "libp2p-noise"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ef6c490042f549fb1025f2892dfe6083d97a77558f450c1feebe748ca9eb15a"
+checksum = "93c77142e3e5b18fefa7d267305c777c9cbe9b2232ec489979390100bebcc1e6"
 dependencies = [
  "bytes",
- "curve25519-dalek 2.1.0",
+ "curve25519-dalek",
  "futures",
  "lazy_static",
  "libp2p-core",
@@ -1088,18 +1067,18 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.7.3",
- "sha2 0.8.2",
+ "sha2 0.9.2",
  "snow",
  "static_assertions 1.1.0",
- "x25519-dalek 0.6.0",
+ "x25519-dalek",
  "zeroize",
 ]
 
 [[package]]
 name = "libp2p-swarm"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7193e444210132237b81b755ec7fe53f1c4bd2f53cf719729b94c0c72eb6eaa1"
+checksum = "ffa6fa33b16956b8a58afbfebe1406866011a1ab8960765bd36868952d7be6a1"
 dependencies = [
  "either",
  "futures",
@@ -1113,13 +1092,13 @@ dependencies = [
 
 [[package]]
 name = "libp2p-tcp"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44f42ec130d7a37a7e47bf4398026b7ad9185c08ed26972e2720f8b94112796f"
+checksum = "9d0b6f4ef48d9493607fae069deecce0579320a1f3de6cb056770b151018a9a5"
 dependencies = [
  "futures",
  "futures-timer",
- "get_if_addrs",
+ "if-addrs",
  "ipnet",
  "libp2p-core",
  "log",
@@ -1171,15 +1150,6 @@ dependencies = [
  "sha2 0.8.2",
  "subtle 2.3.0",
  "typenum",
-]
-
-[[package]]
-name = "lock_api"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4da24a77a3d8a6d4862d95f72e6fdb9c09a643ecdb402d754004a557f2bec75"
-dependencies = [
- "scopeguard",
 ]
 
 [[package]]
@@ -1358,6 +1328,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "nohash-hasher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1424,37 +1400,13 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3a704eb390aafdc107b0e392f56a82b668e3a71366993b5340f5833fd62505e"
-dependencies = [
- "lock_api 0.3.4",
- "parking_lot_core 0.7.2",
-]
-
-[[package]]
-name = "parking_lot"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4893845fa2ca272e647da5d0e46660a314ead9c2fdd9a883aabc32e481a8733"
 dependencies = [
  "instant",
- "lock_api 0.4.1",
- "parking_lot_core 0.8.0",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d58c7c768d4ba344e3e8d72518ac13e259d7c7ade24167003b8488e10b6740a3"
-dependencies = [
- "cfg-if 0.1.10",
- "cloudabi 0.0.3",
- "libc",
- "redox_syscall",
- "smallvec",
- "winapi 0.3.9",
+ "lock_api",
+ "parking_lot_core",
 ]
 
 [[package]]
@@ -2009,7 +1961,7 @@ dependencies = [
  "rustc_version",
  "sha2 0.9.2",
  "subtle 2.3.0",
- "x25519-dalek 1.1.0",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -2327,19 +2279,13 @@ dependencies = [
 
 [[package]]
 name = "unsigned-varint"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "669d776983b692a906c881fcd0cfb34271a48e197e4d6cb8df32b05bfc3d3fa5"
+checksum = "f7fdeedbf205afadfe39ae559b75c3240f24e257d0ca27e85f85cb82aa19ac35"
 dependencies = [
  "bytes",
  "futures_codec",
 ]
-
-[[package]]
-name = "unsigned-varint"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7fdeedbf205afadfe39ae559b75c3240f24e257d0ca27e85f85cb82aa19ac35"
 
 [[package]]
 name = "untrusted"
@@ -2456,7 +2402,7 @@ checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
 dependencies = [
  "futures",
  "js-sys",
- "parking_lot 0.11.0",
+ "parking_lot",
  "pin-utils",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2537,22 +2483,11 @@ dependencies = [
 
 [[package]]
 name = "x25519-dalek"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "637ff90c9540fa3073bb577e65033069e4bae7c79d49d74aa3ffdf5342a53217"
-dependencies = [
- "curve25519-dalek 2.1.0",
- "rand_core 0.5.1",
- "zeroize",
-]
-
-[[package]]
-name = "x25519-dalek"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc614d95359fd7afc321b66d2107ede58b246b844cf5d8a0adcca413e439f088"
 dependencies = [
- "curve25519-dalek 3.0.0",
+ "curve25519-dalek",
  "rand_core 0.5.1",
  "zeroize",
 ]

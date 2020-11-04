@@ -33,7 +33,7 @@ tokio-util = { version = "0.3.1", features = ["codec", "compat"] }
 tokio-io-timeout = "0.4.0"
 
 [dependencies.libp2p]
-version = "0.28.0"
-# version = "0.29.0"
+# version = "0.28.0"
+version = "0.29.0"
 default-features = false
 features = ["identify", "mplex", "noise", "tcp-tokio"]
