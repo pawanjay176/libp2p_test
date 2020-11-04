@@ -564,6 +564,7 @@ impl ProtocolsHandler for RPCHandler {
                                 .unwrap_or_else(|| 0);
                             if remaining_chunks == 0 {
                                 // this is the last expected message, close the stream as all expected chunks have been received
+                                warn!(self.log, "Received all the expected RPC chuncks. Closing");
                                 substream_entry.state = OutboundSubstreamState::Closing(substream);
                             } else {
                                 // If the response chunk was expected update the remaining number of chunks expected and reset the Timeout
@@ -715,10 +716,15 @@ async fn process_inbound_substream(
     let mut errors = Vec::new();
     let mut substream_closed = false;
 
+    println!("Entering");
     for item in pending_items {
         if !substream_closed {
             if matches!(item, RPCCodedResponse::StreamTermination(_)) {
-                substream.close().await.unwrap_or_else(|e| errors.push(e));
+                println!("received a stream termination, closing");
+                substream.close().await.unwrap_or_else(|e| {
+                    println!("closing on stream termination failed: {}", e);
+                    errors.push(e);
+                });
                 substream_closed = true;
             } else {
                 remaining_chunks = remaining_chunks.saturating_sub(1);
@@ -726,22 +732,29 @@ async fn process_inbound_substream(
                 // the response is an error
                 let is_error = matches!(item, RPCCodedResponse::Error(..));
 
-                substream
-                    .send(item)
-                    .await
-                    .unwrap_or_else(|e| errors.push(e));
+                println!("sending item: {}", item);
+                substream.send(item).await.unwrap_or_else(|e| {
+                    println!("sending item failed: {}", e);
+                    errors.push(e)
+                });
 
                 if remaining_chunks == 0 || is_error {
-                    substream.close().await.unwrap_or_else(|e| errors.push(e));
+                    println!("Remaining chunks is 0, or error, closing");
+                    substream.close().await.unwrap_or_else(|e| {
+                        println!("Closing on remaining_chunks is 0 or error failed: {}", e);
+                        errors.push(e)
+                    });
                     substream_closed = true;
                 }
             }
         } else {
+            println!("Sending responses to closed inbound substream {}", item);
             // we have more items after a closed substream, report those as errors
             errors.push(RPCError::InternalError(
                 "Sending responses to closed inbound substream",
             ));
         }
     }
+    println!("Leaving");
     (substream, errors, substream_closed, remaining_chunks)
 }
