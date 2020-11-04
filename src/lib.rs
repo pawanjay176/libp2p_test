@@ -14,6 +14,8 @@ use rpc::*;
 use std::pin::Pin;
 pub mod rpc;
 
+pub const COUNT: u64 = 256;
+
 /// Identifier of requests sent by a peer.
 pub type PeerRequestId = (ConnectionId, SubstreamId);
 

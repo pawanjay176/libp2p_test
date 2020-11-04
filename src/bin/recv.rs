@@ -61,14 +61,17 @@ async fn main() {
 
                                 let peer_request_id = (handler_id, id);
                                 match request {
-                                    RPCRequest::BlocksByRange(_req) => {
+                                    RPCRequest::BlocksByRange(req) => {
                                         let resp = Response::BlocksByRange(Some(vec![42; 42]));
-                                        swarm.send_successful_response(
-                                            peer_id.clone(),
-                                            peer_request_id,
-                                            resp,
-                                        );
-                                        println!("Sent response");
+                                        for i in 0..req.count {
+                                            swarm.send_successful_response(
+                                                peer_id.clone(),
+                                                peer_request_id,
+                                                resp.clone(),
+                                            );
+                                            println!("Sent response {}", i);
+                                        }
+
                                         swarm.send_successful_response(
                                             peer_id,
                                             peer_request_id,

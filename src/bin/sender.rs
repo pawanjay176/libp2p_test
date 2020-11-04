@@ -32,10 +32,8 @@ async fn main() {
     let sender_ma: Multiaddr = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
     Swarm::listen_on(&mut swarm, sender_ma).unwrap();
     Swarm::dial_addr(&mut swarm, recv_ma).unwrap();
+    let mut recv_count = 0;
     let sender = async move {
-        // Swarm::dial_addr(&mut swarm, recv_ma.clone()).unwrap();
-        // let mut req_id = swarm.ping.send_request(&recv_id, ping.clone());
-
         loop {
             match swarm.next_event().await {
                 SwarmEvent::Behaviour(event) => match event {
@@ -66,28 +64,35 @@ async fn main() {
 
                                 let peer_request_id = (handler_id, id);
                                 match request {
-                                    RPCRequest::BlocksByRange(_req) => {
+                                    RPCRequest::BlocksByRange(req) => {
                                         let resp = Response::BlocksByRange(Some(vec![42; 42]));
-                                        swarm.send_successful_response(
-                                            peer_id.clone(),
-                                            peer_request_id,
-                                            resp,
-                                        );
+                                        for i in 0..req.count {
+                                            swarm.send_successful_response(
+                                                peer_id.clone(),
+                                                peer_request_id,
+                                                resp.clone(),
+                                            );
+                                            println!("Sent response {}", i);
+                                        }
+
                                         swarm.send_successful_response(
                                             peer_id,
                                             peer_request_id,
                                             Response::BlocksByRange(None),
                                         );
+                                        println!("Sent termination");
                                     }
                                 }
                             }
                             Ok(RPCReceived::Response(_id, resp)) => match resp {
                                 RPCResponse::BlocksByRange(resp) => {
                                     println!("Got response of length {}", resp.len());
+                                    recv_count += 1;
                                 }
                             },
                             Ok(RPCReceived::EndOfStream(_id, _termination)) => {
-                                println!("Got end of stream");
+                                println!("Got end of stream, count: {}", recv_count);
+                                assert_eq!(COUNT, recv_count);
                                 return;
                             }
                         }
@@ -100,7 +105,7 @@ async fn main() {
                     let req = Request::BlocksByRange(BlocksByRangeRequest {
                         start_slot: 0,
                         step: 1,
-                        count: 5,
+                        count: COUNT,
                     });
                     swarm.send_request(peer_id, RequestId::Sync(5), req);
                 }
