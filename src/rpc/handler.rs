@@ -14,7 +14,7 @@ use libp2p::swarm::protocols_handler::{
     KeepAlive, ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol,
 };
 use libp2p::swarm::NegotiatedSubstream;
-use slog::{crit, debug, warn};
+use slog::{crit, warn};
 use smallvec::SmallVec;
 use std::{
     collections::hash_map::Entry,
@@ -185,40 +185,6 @@ impl RPCHandler {
         }
     }
 
-    /// Returns a reference to the listen protocol configuration.
-    ///
-    /// > **Note**: If you modify the protocol, modifications will only applies to future inbound
-    /// >           substreams, not the ones already being negotiated.
-    pub fn listen_protocol_ref(&self) -> &SubstreamProtocol<RPCProtocol, ()> {
-        &self.listen_protocol
-    }
-
-    /// Returns a mutable reference to the listen protocol configuration.
-    ///
-    /// > **Note**: If you modify the protocol, modifications will only apply to future inbound
-    /// >           substreams, not the ones already being negotiated.
-    pub fn listen_protocol_mut(&mut self) -> &mut SubstreamProtocol<RPCProtocol, ()> {
-        &mut self.listen_protocol
-    }
-
-    /// Initiates the handler's shutdown process, sending an optional last message to the peer.
-    pub fn shutdown(&mut self, final_msg: Option<(RequestId, RPCRequest)>) {
-        debug!(self.log, "Starting handler shutdown"; "unsent_queued_requests" => self.dial_queue.len());
-        // we now drive to completion communications already dialed/established
-        while let Some((id, req)) = self.dial_queue.pop() {
-            self.pending_errors.push(HandlerErr::Outbound {
-                id,
-                proto: req.protocol(),
-                error: RPCError::HandlerRejected,
-            })
-        }
-
-        // Queue our final message, if any
-        if let Some((id, req)) = final_msg {
-            self.dial_queue.push((id, req));
-        }
-    }
-
     /// Opens an outbound substream with a request.
     fn send_request(&mut self, id: RequestId, req: RPCRequest) {
         self.dial_queue.push((id, req));
@@ -358,6 +324,7 @@ impl ProtocolsHandler for RPCHandler {
             <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Error,
         >,
     ) {
+        warn!(self.log, "Dial upgrade error"; "request_info" => ?request_info, "error" => %error);
         let (id, req) = request_info;
         if let ProtocolsHandlerUpgrErr::Upgrade(UpgradeError::Apply(RPCError::IoError(_))) = error {
             self.outbound_io_error_retries += 1;
