@@ -22,16 +22,13 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::time::{delay_queue, delay_until, Delay, DelayQueue, Instant as TInstant};
+use tokio::time::{delay_queue, DelayQueue};
 
 /// The time (in seconds) before a substream that is awaiting a response from the user times out.
 pub const RESPONSE_TIMEOUT: u64 = 10;
 
 /// The number of times to retry an outbound upgrade in the case of IO errors.
 const IO_ERROR_RETRIES: u8 = 3;
-
-/// Maximum time given to the handler to perform shutdown operations.
-const SHUTDOWN_TIMEOUT_SECS: u8 = 15;
 
 /// Identifier of inbound and outbound substreams from the handler's perspective.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -107,31 +104,12 @@ pub struct RPCHandler {
     /// Sequential ID for outbound substreams.
     current_outbound_substream_id: SubstreamId,
 
-    /// Maximum number of concurrent outbound substreams being opened. Value is never modified.
-    max_dial_negotiated: u32,
-
-    /// State of the handler.
-    state: HandlerState,
-
     /// Try to negotiate the outbound upgrade a few times if there is an IO error before reporting the request as failed.
     /// This keeps track of the number of attempts.
     outbound_io_error_retries: u8,
 
     /// Logger for handling RPC streams
     log: slog::Logger,
-}
-
-enum HandlerState {
-    /// The handler is active. All messages are sent and received.
-    Active,
-    /// The handler is shutting_down.
-    ///
-    /// While in this state the handler rejects new requests but tries to finish existing ones.
-    /// Once the timer expires, all messages are killed.
-    ShuttingDown(Delay),
-    /// The handler is deactivated. A goodbye has been sent and no more messages are sent or
-    /// received.
-    Deactivated,
 }
 
 /// Contains the information the handler keeps on established inbound substreams.
@@ -172,27 +150,6 @@ enum InboundState {
     Poisoned,
 }
 
-// impl InboundState {
-//     /// Sends the given items over the underlying substream, if the state allows it, and returns the
-//     /// final state.
-//     fn send_items(self, pending_items: &mut Vec<RPCCodedResponse>, remaining_chunks: u64) -> Self {
-//         if let InboundState::Idle(substream) = self {
-//             // only send on Idle
-//             if !pending_items.is_empty() {
-//                 // take the items that we need to send
-//                 let to_send = std::mem::replace(pending_items, vec![]);
-//                 let fut = process_inbound_substream(substream, remaining_chunks, to_send).boxed();
-//                 InboundState::Busy(Box::pin(fut))
-//             } else {
-//                 // nothing to do, keep waiting for responses
-//                 InboundState::Idle(substream)
-//             }
-//         } else {
-//             self
-//         }
-//     }
-// }
-
 /// State of an outbound substream. Either waiting for a response, or in the process of sending.
 pub enum OutboundSubstreamState {
     /// A request has been sent, and we are awaiting a response. This future is driven in the
@@ -223,8 +180,6 @@ impl RPCHandler {
             outbound_substreams_delay: DelayQueue::new(),
             current_inbound_substream_id: SubstreamId(0),
             current_outbound_substream_id: SubstreamId(0),
-            state: HandlerState::Active,
-            max_dial_negotiated: 8,
             outbound_io_error_retries: 0,
             log: log.clone(),
         }
@@ -248,42 +203,25 @@ impl RPCHandler {
 
     /// Initiates the handler's shutdown process, sending an optional last message to the peer.
     pub fn shutdown(&mut self, final_msg: Option<(RequestId, RPCRequest)>) {
-        if matches!(self.state, HandlerState::Active) {
-            debug!(self.log, "Starting handler shutdown"; "unsent_queued_requests" => self.dial_queue.len());
-            // we now drive to completion communications already dialed/established
-            while let Some((id, req)) = self.dial_queue.pop() {
-                self.pending_errors.push(HandlerErr::Outbound {
-                    id,
-                    proto: req.protocol(),
-                    error: RPCError::HandlerRejected,
-                })
-            }
+        debug!(self.log, "Starting handler shutdown"; "unsent_queued_requests" => self.dial_queue.len());
+        // we now drive to completion communications already dialed/established
+        while let Some((id, req)) = self.dial_queue.pop() {
+            self.pending_errors.push(HandlerErr::Outbound {
+                id,
+                proto: req.protocol(),
+                error: RPCError::HandlerRejected,
+            })
+        }
 
-            // Queue our final message, if any
-            if let Some((id, req)) = final_msg {
-                self.dial_queue.push((id, req));
-            }
-
-            self.state = HandlerState::ShuttingDown(delay_until(
-                TInstant::now() + Duration::from_secs(SHUTDOWN_TIMEOUT_SECS as u64),
-            ));
+        // Queue our final message, if any
+        if let Some((id, req)) = final_msg {
+            self.dial_queue.push((id, req));
         }
     }
 
     /// Opens an outbound substream with a request.
     fn send_request(&mut self, id: RequestId, req: RPCRequest) {
-        match self.state {
-            HandlerState::Active => {
-                self.dial_queue.push((id, req));
-            }
-            _ => {
-                self.pending_errors.push(HandlerErr::Outbound {
-                    id,
-                    proto: req.protocol(),
-                    error: RPCError::HandlerRejected,
-                });
-            }
-        }
+        self.dial_queue.push((id, req));
     }
 
     /// Sends a response to a peer's request.
@@ -309,12 +247,6 @@ impl RPCHandler {
             self.pending_errors.push(err);
         }
 
-        if matches!(self.state, HandlerState::Deactivated) {
-            // we no longer send responses after the handler is deactivated
-            debug!(self.log, "Response not sent. Deactivated handler";
-                "response" => response.to_string(), "id" => inbound_id);
-            return;
-        }
         inbound_info.pending_items.push(response);
     }
 }
@@ -337,11 +269,6 @@ impl ProtocolsHandler for RPCHandler {
         substream: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
         _info: Self::InboundOpenInfo,
     ) {
-        // only accept new peer requests when active
-        if !matches!(self.state, HandlerState::Active) {
-            return;
-        }
-
         let (req, substream) = substream;
         let expected_responses = req.expected_responses();
 
@@ -378,16 +305,6 @@ impl ProtocolsHandler for RPCHandler {
         self.dial_negotiated -= 1;
         let (id, request) = request_info;
         let proto = request.protocol();
-
-        // accept outbound connections only if the handler is not deactivated
-        if matches!(self.state, HandlerState::Deactivated) {
-            self.pending_errors.push(HandlerErr::Outbound {
-                id,
-                proto,
-                error: RPCError::HandlerRejected,
-            });
-            return;
-        }
 
         // add the stream to substreams if we expect a response, otherwise drop the stream.
         let expected_responses = request.expected_responses();
@@ -487,26 +404,7 @@ impl ProtocolsHandler for RPCHandler {
         // Check that we don't have outbound items pending for dialing, nor dialing, nor
         // established. Also check that there are no established inbound substreams.
         // Errors and events need to be reported back, so check those too.
-        let should_shutdown = match self.state {
-            HandlerState::ShuttingDown(_) => {
-                self.dial_queue.is_empty()
-                    && self.outbound_substreams.is_empty()
-                    && self.inbound_substreams.is_empty()
-                    && self.pending_errors.is_empty()
-                    && self.events_out.is_empty()
-                    && self.dial_negotiated == 0
-            }
-            HandlerState::Deactivated => {
-                // Regardless of events, the timeout has expired. Force the disconnect.
-                true
-            }
-            _ => false,
-        };
-        if should_shutdown {
-            KeepAlive::No
-        } else {
-            KeepAlive::Yes
-        }
+        KeepAlive::Yes
     }
 
     fn poll(
@@ -531,14 +429,6 @@ impl ProtocolsHandler for RPCHandler {
             return Poll::Ready(ProtocolsHandlerEvent::Custom(Ok(self.events_out.remove(0))));
         } else {
             self.events_out.shrink_to_fit();
-        }
-
-        // Check if we are shutting down, and if the timer ran out
-        if let HandlerState::ShuttingDown(delay) = &self.state {
-            if delay.is_elapsed() {
-                self.state = HandlerState::Deactivated;
-                debug!(self.log, "Handler deactivated");
-            }
         }
 
         // purge expired inbound substreams and send an error
@@ -603,15 +493,12 @@ impl ProtocolsHandler for RPCHandler {
             }
         }
 
-        // when deactivated, close all streams
-        let deactivated = matches!(self.state, HandlerState::Deactivated);
-
         // drive inbound streams that need to be processed
         let mut substreams_to_remove = Vec::new(); // Closed substreams that need to be removed
         for (id, info) in self.inbound_substreams.iter_mut() {
             loop {
                 match std::mem::replace(&mut info.state, InboundState::Poisoned) {
-                    InboundState::Idle(substream) if !deactivated => {
+                    InboundState::Idle(substream) => {
                         if !info.pending_items.is_empty() {
                             let to_send = std::mem::replace(&mut info.pending_items, vec![]);
                             let fut = process_inbound_substream(
@@ -625,36 +512,6 @@ impl ProtocolsHandler for RPCHandler {
                             info.state = InboundState::Idle(substream);
                             break;
                         }
-                    }
-                    InboundState::Idle(mut substream) => {
-                        // handler is deactivated, close the stream and mark it for removal
-                        match substream.close().poll_unpin(cx) {
-                            // if we can't close right now, put the substream back and try again later
-                            Poll::Pending => info.state = InboundState::Idle(substream),
-                            Poll::Ready(res) => {
-                                substreams_to_remove.push(*id);
-                                if let Some(ref delay_key) = info.delay_key {
-                                    self.inbound_substreams_delay.remove(delay_key);
-                                }
-                                if let Err(error) = res {
-                                    self.pending_errors.push(HandlerErr::Inbound {
-                                        id: *id,
-                                        error,
-                                        proto: info.protocol,
-                                    });
-                                }
-                                if info.pending_items.last().map(|l| l.close_after()) == Some(false)
-                                {
-                                    // if the request was still active, report back to cancel it
-                                    self.pending_errors.push(HandlerErr::Inbound {
-                                        id: *id,
-                                        proto: info.protocol,
-                                        error: RPCError::HandlerRejected,
-                                    });
-                                }
-                            }
-                        }
-                        break;
                     }
                     InboundState::Busy(mut fut) => {
                         // first check if sending finished
@@ -679,7 +536,7 @@ impl ProtocolsHandler for RPCHandler {
                                 // The stream may be currently idle. Attempt to process more
                                 // elements
 
-                                if !deactivated && !info.pending_items.is_empty() {
+                                if !info.pending_items.is_empty() {
                                     let to_send =
                                         std::mem::replace(&mut info.pending_items, vec![]);
                                     let fut = process_inbound_substream(
@@ -725,18 +582,6 @@ impl ProtocolsHandler for RPCHandler {
             };
 
             match state {
-                OutboundSubstreamState::RequestPendingResponse {
-                    substream,
-                    request: _,
-                } if deactivated => {
-                    // the handler is deactivated. Close the stream
-                    entry.get_mut().state = OutboundSubstreamState::Closing(substream);
-                    self.pending_errors.push(HandlerErr::Outbound {
-                        id: entry.get().req_id,
-                        proto: entry.get().proto,
-                        error: RPCError::HandlerRejected,
-                    })
-                }
                 OutboundSubstreamState::RequestPendingResponse {
                     mut substream,
                     request,
@@ -871,7 +716,7 @@ impl ProtocolsHandler for RPCHandler {
         }
 
         // establish outbound substreams
-        if !self.dial_queue.is_empty() && self.dial_negotiated < self.max_dial_negotiated {
+        if !self.dial_queue.is_empty() {
             self.dial_negotiated += 1;
             let (id, req) = self.dial_queue.remove(0);
             self.dial_queue.shrink_to_fit();
