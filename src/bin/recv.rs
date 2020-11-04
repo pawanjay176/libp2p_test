@@ -62,12 +62,13 @@ async fn main() {
                                 let peer_request_id = (handler_id, id);
                                 match request {
                                     RPCRequest::BlocksByRange(req) => {
-                                        let resp = Response::BlocksByRange(Some(vec![42; 42]));
                                         for i in 0..req.count {
+                                            let resp =
+                                                Response::BlocksByRange(Some(vec![i as u8; 42]));
                                             swarm.send_successful_response(
                                                 peer_id.clone(),
                                                 peer_request_id,
-                                                resp.clone(),
+                                                resp,
                                             );
                                             println!("Sent response {}", i);
                                         }
@@ -99,4 +100,5 @@ async fn main() {
         }
     };
     recv.await;
+    tokio::time::delay_for(tokio::time::Duration::from_secs(30)).await;
 }

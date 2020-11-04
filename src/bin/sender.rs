@@ -86,7 +86,11 @@ async fn main() {
                             }
                             Ok(RPCReceived::Response(_id, resp)) => match resp {
                                 RPCResponse::BlocksByRange(resp) => {
-                                    println!("Got response of length {}", resp.len());
+                                    println!(
+                                        "Got response of length {}, num: {}",
+                                        resp.len(),
+                                        resp[0]
+                                    );
                                     recv_count += 1;
                                 }
                             },
