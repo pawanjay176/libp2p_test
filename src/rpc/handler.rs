@@ -71,6 +71,8 @@ pub enum HandlerErr {
 
 /// Implementation of `ProtocolsHandler` for the RPC protocol.
 pub struct RPCHandler {
+    received_responses: usize,
+
     /// The upgrade for inbound substreams.
     listen_protocol: SubstreamProtocol<RPCProtocol, ()>,
 
@@ -169,6 +171,7 @@ pub enum OutboundSubstreamState {
 impl RPCHandler {
     pub fn new(listen_protocol: SubstreamProtocol<RPCProtocol, ()>, log: &slog::Logger) -> Self {
         RPCHandler {
+            received_responses: 0,
             listen_protocol,
             pending_errors: Vec::new(),
             events_out: SmallVec::new(),
@@ -194,6 +197,11 @@ impl RPCHandler {
     // NOTE: If the substream has closed due to inactivity, or the substream is in the
     // wrong state a response will fail silently.
     fn send_response(&mut self, inbound_id: SubstreamId, response: RPCCodedResponse) {
+        self.received_responses += 1;
+        println!(
+            "[{}] handler is asked to send response {}",
+            self.received_responses, response
+        );
         // check if the stream matching the response still exists
         let inbound_info = if let Some(info) = self.inbound_substreams.get_mut(&inbound_id) {
             info
@@ -716,7 +724,7 @@ async fn process_inbound_substream(
     let mut errors = Vec::new();
     let mut substream_closed = false;
 
-    println!("Entering");
+    println!("Handler Entering to send {} items", pending_items.len());
     for item in pending_items {
         if !substream_closed {
             if matches!(item, RPCCodedResponse::StreamTermination(_)) {
@@ -732,9 +740,9 @@ async fn process_inbound_substream(
                 // the response is an error
                 let is_error = matches!(item, RPCCodedResponse::Error(..));
 
-                println!("sending item: {}", item);
-                substream.send(item).await.unwrap_or_else(|e| {
-                    println!("sending item failed: {}", e);
+                println!("handler sending response {}", item);
+                substream.send(item.clone()).await.unwrap_or_else(|e| {
+                    println!("sending {} failed: {}", item, e);
                     errors.push(e)
                 });
 
@@ -755,6 +763,5 @@ async fn process_inbound_substream(
             ));
         }
     }
-    println!("Leaving");
     (substream, errors, substream_closed, remaining_chunks)
 }
