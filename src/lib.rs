@@ -15,6 +15,7 @@ use std::pin::Pin;
 pub mod rpc;
 
 pub const COUNT: u64 = 256;
+// it would usually be MAX_REQUEST_BLOCKS = 1024;
 
 /// Identifier of requests sent by a peer.
 pub type PeerRequestId = (ConnectionId, SubstreamId);
@@ -139,7 +140,7 @@ pub fn mk_transport() -> (PublicKey, transport::Boxed<(PeerId, StreamMuxerBox)>)
 //     let noise_keys = Keypair::<X25519Spec>::new()
 //         .into_authentic(&id_keys)
 //         .unwrap();
-
+//
 //     let transport = transport
 //         .upgrade(libp2p::core::upgrade::Version::V1)
 //         .authenticate(NoiseConfig::xx(noise_keys).into_authenticated())
