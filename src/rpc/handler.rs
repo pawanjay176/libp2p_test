@@ -71,8 +71,6 @@ pub enum HandlerErr {
 
 /// Implementation of `ProtocolsHandler` for the RPC protocol.
 pub struct RPCHandler {
-    received_responses: usize,
-
     /// The upgrade for inbound substreams.
     listen_protocol: SubstreamProtocol<RPCProtocol, ()>,
 
@@ -170,8 +168,8 @@ pub enum OutboundSubstreamState {
 
 impl RPCHandler {
     pub fn new(listen_protocol: SubstreamProtocol<RPCProtocol, ()>, log: &slog::Logger) -> Self {
+        println!("New handler!");
         RPCHandler {
-            received_responses: 0,
             listen_protocol,
             pending_errors: Vec::new(),
             events_out: SmallVec::new(),
@@ -197,17 +195,14 @@ impl RPCHandler {
     // NOTE: If the substream has closed due to inactivity, or the substream is in the
     // wrong state a response will fail silently.
     fn send_response(&mut self, inbound_id: SubstreamId, response: RPCCodedResponse) {
-        self.received_responses += 1;
-        println!(
-            "[{}] handler is asked to send response {}",
-            self.received_responses, response
-        );
         // check if the stream matching the response still exists
         let inbound_info = if let Some(info) = self.inbound_substreams.get_mut(&inbound_id) {
             info
         } else {
-            warn!(self.log, "Stream has expired. Response not sent";
+            if !response.close_after() {
+                warn!(self.log, "Stream has expired. Response not sent";
                 "response" => response.to_string(), "id" => inbound_id);
+            }
             return;
         };
 
@@ -572,7 +567,6 @@ impl ProtocolsHandler for RPCHandler {
                                 .unwrap_or_else(|| 0);
                             if remaining_chunks == 0 {
                                 // this is the last expected message, close the stream as all expected chunks have been received
-                                warn!(self.log, "Received all the expected RPC chuncks. Closing");
                                 substream_entry.state = OutboundSubstreamState::Closing(substream);
                             } else {
                                 // If the response chunk was expected update the remaining number of chunks expected and reset the Timeout
@@ -613,7 +607,9 @@ impl ProtocolsHandler for RPCHandler {
                         // stream closed
                         // if we expected multiple streams send a stream termination,
                         // else report the stream terminating only.
-                        //trace!(self.log, "RPC Response - stream closed by remote");
+                        println!(
+                            "stream closed without error, sending EndOfStream to the application"
+                        );
                         // drop the stream
                         let delay_key = &entry.get().delay_key;
                         let request_id = entry.get().req_id;
@@ -640,6 +636,7 @@ impl ProtocolsHandler for RPCHandler {
                             OutboundSubstreamState::RequestPendingResponse { substream, request }
                     }
                     Poll::Ready(Some(Err(e))) => {
+                        println!("Polling substream failed: {}", e);
                         // drop the stream
                         let delay_key = &entry.get().delay_key;
                         self.outbound_substreams_delay.remove(delay_key);
@@ -724,15 +721,19 @@ async fn process_inbound_substream(
     let mut errors = Vec::new();
     let mut substream_closed = false;
 
-    println!("Handler Entering to send {} items", pending_items.len());
+    println!(
+        "Handler Entering to send {} items: from:{} to:{}",
+        pending_items.len(),
+        pending_items.first().unwrap(),
+        pending_items.last().unwrap()
+    );
     for item in pending_items {
         if !substream_closed {
             if matches!(item, RPCCodedResponse::StreamTermination(_)) {
-                println!("received a stream termination, closing");
-                substream.close().await.unwrap_or_else(|e| {
+                if let Err(e) = substream.close().await {
                     println!("closing on stream termination failed: {}", e);
                     errors.push(e);
-                });
+                }
                 substream_closed = true;
             } else {
                 remaining_chunks = remaining_chunks.saturating_sub(1);
@@ -740,27 +741,27 @@ async fn process_inbound_substream(
                 // the response is an error
                 let is_error = matches!(item, RPCCodedResponse::Error(..));
 
-                println!("handler sending response {}", item);
-                substream.send(item.clone()).await.unwrap_or_else(|e| {
+                if let Err(e) = substream.send(item.clone()).await {
                     println!("sending {} failed: {}", item, e);
                     errors.push(e)
-                });
+                }
 
                 if remaining_chunks == 0 || is_error {
-                    println!("Remaining chunks is 0, or error, closing");
-                    substream.close().await.unwrap_or_else(|e| {
+                    if let Err(e) = substream.close().await {
                         println!("Closing on remaining_chunks is 0 or error failed: {}", e);
                         errors.push(e)
-                    });
+                    }
                     substream_closed = true;
                 }
             }
         } else {
-            println!("Sending responses to closed inbound substream {}", item);
-            // we have more items after a closed substream, report those as errors
-            errors.push(RPCError::InternalError(
-                "Sending responses to closed inbound substream",
-            ));
+            if !item.close_after() {
+                // we have more items after a closed substream, report those as errors
+                println!("Sending items to closed inbound substream");
+                errors.push(RPCError::InternalError(
+                    "Sending responses to closed inbound substream",
+                ));
+            }
         }
     }
     (substream, errors, substream_closed, remaining_chunks)
