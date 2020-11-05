@@ -70,7 +70,6 @@ async fn main() {
                                                 peer_request_id,
                                                 resp,
                                             );
-                                            println!("Sent response {}", i);
                                         }
 
                                         swarm.send_successful_response(
@@ -89,16 +88,16 @@ async fn main() {
                             },
                             Ok(RPCReceived::EndOfStream(_id, _termination)) => {
                                 println!("Got end of stream");
-                                return;
                             }
                         }
                     }
                 },
-                SwarmEvent::ConnectionClosed { .. } => return,
+                SwarmEvent::ConnectionClosed { cause, .. } => {
+                    println!("Connection with peer ended with cause: {:?}", cause);
+                }
                 _ => {}
             }
         }
     };
     recv.await;
-    tokio::time::delay_for(tokio::time::Duration::from_secs(30)).await;
 }

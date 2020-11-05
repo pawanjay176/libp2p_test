@@ -96,8 +96,11 @@ async fn main() {
                             },
                             Ok(RPCReceived::EndOfStream(_id, _termination)) => {
                                 println!("Got end of stream, count: {}", recv_count);
-                                assert_eq!(COUNT, recv_count);
-                                return;
+                                if COUNT != recv_count {
+                                    println!("DID NOT RECEIVE ALL EXPECTED RESPONSES. Expected:{} Received:{}", COUNT, recv_count);
+                                } else {
+                                    println!("ALL RESPONSES RECEIVED");
+                                }
                             }
                         }
                     }
@@ -113,7 +116,9 @@ async fn main() {
                     });
                     swarm.send_request(peer_id, RequestId::Sync(5), req);
                 }
-                SwarmEvent::ConnectionClosed { .. } => return,
+                SwarmEvent::ConnectionClosed { cause, .. } => {
+                    println!("Connection with peer ended with cause: {:?}", cause);
+                }
                 _ => {}
             }
         }
